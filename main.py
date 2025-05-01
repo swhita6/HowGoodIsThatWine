@@ -21,7 +21,7 @@ theta   = rng.random((12,NUM_CLASSES))#np.random.rand(12,NUM_CLASSES) #weigth ar
 
 def bucketize(y): #reduces data to 3 classes
     y = np.asarray(y, dtype=int)
-    # np.digitize splits at 5, 7 and produces 0, 1, 2
+    # np.digitize splits at 4, 6, 8and produces 0, 1, 2, 3
     return np.digitize(y, bins=[4,6,8], right=False)
 
 # Red wine
@@ -64,14 +64,14 @@ hot_white_training  = hot_white_targets[1000:, :]
 
 
 
-def soft_max(weights, samples):
+def soft_max(weights, samples): #computes the soft max
     scores          = samples @ weights
     scores          -= scores.max(axis=1, keepdims=True) #
     e               = np.exp(scores)
 
     return e / e.sum(axis=1,keepdims=True)
 
-def regression_loop(weights, samples, targets):
+def regression_loop(weights, samples, targets): 
     mu = 0.0001
     n = samples.shape[0]
     for i in range(EPOCHS):
@@ -80,8 +80,7 @@ def regression_loop(weights, samples, targets):
         weights     -= mu*gradient
 
         if i % 200 == 0:
-            #loss = -np.mean(np.sum(targets * np.log(y + 1e-15), axis=1))
-            loss = np.mean(np.sum((targets - y)*(targets - y), axis=1))
+            loss = np.mean(np.sum((targets - y)*(targets - y), axis=1)) #mean squared error
             print(f"epoch {i:4d} | loss {loss:.4f}")
 
     return weights
