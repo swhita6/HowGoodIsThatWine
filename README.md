@@ -14,7 +14,7 @@ Make sure you have Python 3.8+ installed. Then run:
 
   ```bash
   pip install numpy pandas scikit-learn matplotlib seaborn
-
+   ```
 3. **Run the project**
 
   ```bash
