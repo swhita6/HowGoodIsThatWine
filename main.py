@@ -14,9 +14,6 @@ EPOCHS = 10000
 red_data = pandas.read_csv("datasets/winequality-red.csv", sep=';').to_numpy(dtype=np.float64)
 white_data = pandas.read_csv("datasets/winequality-white.csv", sep=';').to_numpy(dtype=np.float64)
 
-#print(red_data.shape)
-#print(white_data.shape)
-
 df = pandas.read_csv("datasets/winequality-white.csv", sep=';')
 print(df.columns)
 
@@ -33,12 +30,12 @@ np.random.shuffle(red_data)
 np.random.shuffle(white_data)
 
 rng     = np.random.default_rng(12345)
-theta   = rng.random((12,NUM_CLASSES))#np.random.rand(12,NUM_CLASSES) #weigth array. each class in a row and each featrue is a collum
+theta   = rng.random((12,NUM_CLASSES)) #weight array. each class is a row and each feature is a column
 
 def bucketize(y): #reduces data to 3 classes
     y = np.asarray(y, dtype=int)
     # low: 3-5, medium: 6, high: 7-9
-    # np.digitize splits at 4, 6, 8and produces 0, 1, 2, 3
+    # np.digitize splits at 4, 6, 8 and produces 0, 1, 2, 3
     #return np.digitize(y, bins=[4,6,8], right=False)
     return np.digitize(y, bins=[5, 6], right=True)
 
@@ -85,7 +82,6 @@ hot_white_training  = hot_white_targets[1000:, :]
 
 
 
-
 def soft_max(weights, samples): #computes the soft max
     scores          = samples @ weights
     scores          -= scores.max(axis=1, keepdims=True) #
@@ -116,6 +112,7 @@ def regression_loop(weights, samples, targets):
 def cross_entropy_loss(y_pred, y_true):
     return -np.mean(np.sum(y_true * np.log(y_pred + 1e-9), axis=1))
 
+# generate nice-looking confusion matrix
 def plot_confusion_matrix(cm, title):
     plot.figure(figsize=(6, 5))
     sb.heatmap(cm, annot=True, fmt='d', cmap='Blues',
@@ -137,22 +134,33 @@ white_testing_targets = white_targets[:1000]
 
 cm          = confusion_matrix(white_testing_targets, predicted, labels=[0,1,2])
 
-accuracy    = np.mean(predicted == white_testing_targets) 
+white_accuracy    = np.mean(predicted == white_testing_targets) 
 
-print(f"White Wine Accuracy: {accuracy * 100:.2f}%")
+print(f"White Wine Accuracy: {white_accuracy * 100:.2f}%")
 print(cm)
 plot_confusion_matrix(cm, "White Wine Confusion Matrix")
 
-# ----------------- RANDOM FOREST BELOW -------------------------
-
-rf_white = RandomForestClassifier(n_estimators=100, random_state=42)
-rf_white.fit(white_training[:, 1:], white_targets[1000:])
-rf_preds = rf_white.predict(white_testing[:, 1:])
-rf_acc = accuracy_score(white_targets[:1000], rf_preds)
-print(f"White Wine Accuracy (Random Forest): {rf_acc * 100:.2f}%")
 
 
-# ----------------- POLYNOMIAL FEATURE BELOW -------------------------
+theta       = rng.random((12,NUM_CLASSES))
+
+theta       = regression_loop(theta, red_training, hot_red_training) 
+
+predicted   = np.argmax(red_testing @ theta, axis = 1)
+
+red_testing_targets = red_targets[:500]
+
+cm          = confusion_matrix(red_testing_targets, predicted, labels=[0,1,2])
+
+red_accuracy    = np.mean(predicted == red_testing_targets) 
+
+print(f"Red Wine Accuracy: {red_accuracy * 100:.2f}%")
+print(cm)
+plot_confusion_matrix(cm, "Red Wine Confusion Matrix")
+
+
+
+# ----------------- POLYNOMIAL FEATURES -------------------------
 
 # Polynomial feature transformation
 poly = PolynomialFeatures(degree=2, include_bias=False)
@@ -170,35 +178,7 @@ acc_white_poly = accuracy_score(white_targets[:1000], predicted_white_poly)
 
 plot_confusion_matrix(cm_white_poly, "White Wine (Polynomial Features)")
 print(f"White Wine Accuracy (Polynomial LogisticRegression): {acc_white_poly * 100:.2f}%")
-print(classification_report(white_targets[:1000], predicted, target_names=["Low", "Medium", "High"]))
-
-
-
-
-theta       = rng.random((12,NUM_CLASSES))
-
-theta       = regression_loop(theta, red_training, hot_red_training) 
-
-predicted   = np.argmax(red_testing @ theta, axis = 1)
-
-red_testing_targets = red_targets[:500]
-
-cm          = confusion_matrix(red_testing_targets, predicted, labels=[0,1,2])
-
-accuracy    = np.mean(predicted == red_testing_targets) 
-
-print(cm)
-plot_confusion_matrix(cm, "Red Wine Confusion Matrix")
-print(f"Red Wine Accuracy: {accuracy * 100:.2f}%")
-
-
-
-rf_red = RandomForestClassifier(n_estimators=100, random_state=42)
-rf_red.fit(red_training[:, 1:], red_targets[500:])
-rf_preds = rf_red.predict(red_testing[:, 1:])
-rf_acc = accuracy_score(red_targets[:500], rf_preds)
-print(f"Red Wine Accuracy (Random Forest): {rf_acc * 100:.2f}%")
-
+#print(classification_report(white_targets[:1000], predicted, target_names=["Low", "Medium", "High"]))
 
 
 # Polynomial feature transformation
@@ -216,4 +196,37 @@ cm_red_poly = confusion_matrix(red_targets[:500], predicted_red_poly, labels=[0,
 acc_red_poly = accuracy_score(red_targets[:500], predicted_red_poly)
 
 print(f"Red Wine Accuracy (Polynomial LogisticRegression): {acc_red_poly * 100:.2f}%")
+plot_confusion_matrix(cm_red_poly, "Red Wine (Polynomial Features)")
 print(classification_report(red_targets[:500], predicted, target_names=["Low", "Medium", "High"]))
+
+
+
+# ----------------- RANDOM FOREST -------------------------
+
+rf_white = RandomForestClassifier(n_estimators=100, random_state=42)
+rf_white.fit(white_training[:, 1:], white_targets[1000:])
+rf_white_preds = rf_white.predict(white_testing[:, 1:])
+rf_white_acc = accuracy_score(white_targets[:1000], rf_white_preds)
+print(f"White Wine Accuracy (Random Forest): {rf_white_acc * 100:.2f}%")
+cm_rf_white = confusion_matrix(white_targets[:1000], rf_white_preds, labels=[0,1,2])
+plot_confusion_matrix(cm_rf_white, "White Wine (Random Forest)")
+
+
+rf_red = RandomForestClassifier(n_estimators=100, random_state=42)
+rf_red.fit(red_training[:, 1:], red_targets[500:])
+rf_red_preds = rf_red.predict(red_testing[:, 1:])
+rf_red_acc = accuracy_score(red_targets[:500], rf_red_preds)
+print(f"Red Wine Accuracy (Random Forest): {rf_red_acc * 100:.2f}%")
+cm_rf_red = confusion_matrix(red_targets[:500], rf_red_preds, labels=[0,1,2])
+plot_confusion_matrix(cm_rf_red, "Red Wine (Random Forest)")
+
+
+
+# Print all averages in one place
+print("\n\nTotal Accuracies:")
+print(f"White Wine Accuracy: {white_accuracy * 100:.2f}%")
+print(f"White Wine Accuracy (Polynomial Logistic Regression): {acc_white_poly * 100:.2f}%")
+print(f"White Wine Accuracy (Random Forest): {rf_white_acc * 100:.2f}%")
+print(f"Red Wine Accuracy: {red_accuracy * 100:.2f}%")
+print(f"Red Wine Accuracy (Polynomial Logistic Regression): {acc_red_poly * 100:.2f}%")
+print(f"Red Wine Accuracy (Random Forest): {rf_red_acc * 100:.2f}%")
