@@ -7,13 +7,16 @@ from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 
-NUM_CLASSES = 3
-EPOCHS = 10000
+NUM_CLASSES = 3        # Number of categories: low, medium, high
+EPOCHS = 10000         # Training iterations
+
+# ----------- Load & Prepare Data -------------
 
 # read data
 red_data = pandas.read_csv("datasets/winequality-red.csv", sep=';').to_numpy(dtype=np.float64)
 white_data = pandas.read_csv("datasets/winequality-white.csv", sep=';').to_numpy(dtype=np.float64)
 
+# print feature names
 df = pandas.read_csv("datasets/winequality-white.csv", sep=';')
 print(df.columns)
 
@@ -25,21 +28,22 @@ red_data[:, :-1] = red_scaler.fit_transform(red_data[:, :-1])
 white_scaler = StandardScaler()
 white_data[:, :-1] = white_scaler.fit_transform(white_data[:, :-1])
 
-# shuffle rows to prevent bias ordering
+# shuffle data to prevent bias ordering
 np.random.shuffle(red_data)
 np.random.shuffle(white_data)
 
+# initialize weights
 rng     = np.random.default_rng(12345)
-theta   = rng.random((12,NUM_CLASSES)) #weight array. each class is a row and each feature is a column
+theta   = rng.random((12,NUM_CLASSES)) # each class is a row and each feature is a column (11 features + 1 bias, 3 classes)
 
-def bucketize(y): #reduces data to 3 classes
+# ------- Helper Functions ---------
+
+def bucketize(y): # reduces data to 3 classes
+    # low: <=5, medium: =6, high: >=7
     y = np.asarray(y, dtype=int)
-    # low: 3-5, medium: 6, high: 7-9
-    # np.digitize splits at 4, 6, 8 and produces 0, 1, 2, 3
-    #return np.digitize(y, bins=[4,6,8], right=False)
     return np.digitize(y, bins=[5, 6], right=True)
 
-# Red wine
+# Prep red wine data
 red_targets_raw     = red_data[:, -1]  # last column = quality score  
 print("Original Quality Score Values, # Samples/Score")
 print(np.unique(red_targets_raw, return_counts=True))
@@ -47,19 +51,20 @@ print(np.unique(red_targets_raw, return_counts=True))
 red_targets         = bucketize(red_targets_raw) 
 print("Bucket Quality Classes, # Samples/bucket")
 print(np.unique(red_targets, return_counts=True))
-hot_red_targets     = np.eye(NUM_CLASSES)[red_targets]
+hot_red_targets     = np.eye(NUM_CLASSES)[red_targets] # one-hot encoding
 
+# add bias term and drop quality column
 red_samples         = np.ones((red_data.shape[0], red_data.shape[1]))
 red_samples[:, 1:]  = red_data[:, :-1]
 
-#Splits into testing and training data
+# Split into testing and training data
 red_testing         = red_samples[:500, :]
 red_training        = red_samples[500:,:]
 
 hot_red_testing     = hot_red_targets[:500,:]
 hot_red_training    = hot_red_targets[500:,:]
 
-# White wine
+# Prep white wine data
 white_targets_raw   = white_data[:, -1]
 print("Original Quality Score Values, # Samples/Score")
 print(np.unique(white_targets_raw, return_counts=True))
@@ -81,8 +86,9 @@ hot_white_testing   = hot_white_targets[:1000, :]
 hot_white_training  = hot_white_targets[1000:, :]
 
 
+# ----- Softmax Regression Functions ------
 
-def soft_max(weights, samples): #computes the soft max
+def soft_max(weights, samples): # computes softmax probabilities
     scores          = samples @ weights
     scores          -= scores.max(axis=1, keepdims=True) #
     e               = np.exp(scores)
@@ -90,7 +96,7 @@ def soft_max(weights, samples): #computes the soft max
     return e / e.sum(axis=1,keepdims=True)
 
 
-# training loop
+# training loop/gradient descent
 def regression_loop(weights, samples, targets): 
     lambda_reg = 0.1 # add regularization
     mu = 0.005 # learning rate
@@ -102,7 +108,6 @@ def regression_loop(weights, samples, targets):
         weights     -= mu*(gradient + lambda_reg * weights)
 
         if i % 200 == 0:
-            # loss = np.mean(np.sum((targets - y)*(targets - y), axis=1)) #mean squared error
             loss = cross_entropy_loss(y, targets)
             print(f"epoch {i:4d} | loss {loss:.4f}")
 
@@ -112,7 +117,7 @@ def regression_loop(weights, samples, targets):
 def cross_entropy_loss(y_pred, y_true):
     return -np.mean(np.sum(y_true * np.log(y_pred + 1e-9), axis=1))
 
-# generate nice-looking confusion matrix
+# generate a heatmap-style confusion matrix
 def plot_confusion_matrix(cm, title):
     plot.figure(figsize=(6, 5))
     sb.heatmap(cm, annot=True, fmt='d', cmap='Blues',
@@ -124,7 +129,7 @@ def plot_confusion_matrix(cm, title):
     plot.tight_layout()
     plot.show()
 
-
+# ------- Train & Evaluate Softmax Logisitic Regression (White Wine) ---------
 
 theta       = regression_loop(theta, white_training, hot_white_training)
 
@@ -140,7 +145,7 @@ print(f"White Wine Accuracy: {white_accuracy * 100:.2f}%")
 print(cm)
 plot_confusion_matrix(cm, "White Wine Confusion Matrix")
 
-
+# ------- Train & Evaluate Softmax Logisitic Regression (Red Wine) ---------
 
 theta       = rng.random((12,NUM_CLASSES))
 
@@ -160,8 +165,9 @@ plot_confusion_matrix(cm, "Red Wine Confusion Matrix")
 
 
 
-# ----------------- POLYNOMIAL FEATURES -------------------------
+# ----------------- Polynomial Logistic Regression -------------------------
 
+# White wine
 # Polynomial feature transformation
 poly = PolynomialFeatures(degree=2, include_bias=False)
 X_white_train_poly = poly.fit_transform(white_training[:, 1:])
@@ -181,6 +187,7 @@ print(f"White Wine Accuracy (Polynomial LogisticRegression): {acc_white_poly * 1
 #print(classification_report(white_targets[:1000], predicted, target_names=["Low", "Medium", "High"]))
 
 
+# Red Wine
 # Polynomial feature transformation
 poly = PolynomialFeatures(degree=2, include_bias=False)
 X_red_train_poly = poly.fit_transform(red_training[:, 1:])
@@ -201,8 +208,9 @@ print(classification_report(red_targets[:500], predicted, target_names=["Low", "
 
 
 
-# ----------------- RANDOM FOREST -------------------------
+# ----------------- Random Forest Classifier -------------------------
 
+# White wine
 rf_white = RandomForestClassifier(n_estimators=100, random_state=42)
 rf_white.fit(white_training[:, 1:], white_targets[1000:])
 rf_white_preds = rf_white.predict(white_testing[:, 1:])
@@ -211,7 +219,7 @@ print(f"White Wine Accuracy (Random Forest): {rf_white_acc * 100:.2f}%")
 cm_rf_white = confusion_matrix(white_targets[:1000], rf_white_preds, labels=[0,1,2])
 plot_confusion_matrix(cm_rf_white, "White Wine (Random Forest)")
 
-
+# Red Wine
 rf_red = RandomForestClassifier(n_estimators=100, random_state=42)
 rf_red.fit(red_training[:, 1:], red_targets[500:])
 rf_red_preds = rf_red.predict(red_testing[:, 1:])
@@ -222,7 +230,7 @@ plot_confusion_matrix(cm_rf_red, "Red Wine (Random Forest)")
 
 
 
-# Print all averages in one place
+# Summary of all accuracy scores
 print("\n\nTotal Accuracies:")
 print(f"White Wine Accuracy: {white_accuracy * 100:.2f}%")
 print(f"White Wine Accuracy (Polynomial Logistic Regression): {acc_white_poly * 100:.2f}%")
